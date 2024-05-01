@@ -1,0 +1,38 @@
+{
+  
+  "scripts": {
+  
+    
+  "dev": "NODE_ENV=development nodemon server.js",
+  
+    
+  "start": "node server.js"
+  
+  },
+  
+  "dependencies": {
+  
+    
+  "and": "^0.0.3",
+  
+    
+  "express": "^4.19.2",
+  
+    
+  "express-validator": "^7.0.1",
+  
+    
+  "swagger-ui-express": "^5.0.0",
+  
+    
+  "yamljs": "^0.3.0"
+  
+  },
+  
+  "devDependencies": {
+  
+    
+  "nodemon": "^3.1.0"
+  
+  }
+}
