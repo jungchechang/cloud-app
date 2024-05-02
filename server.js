@@ -1,5 +1,6 @@
 const express = require('express')
 const morgan = require('morgan')
+const sequelize = require("./sequelize")
 const api = require('./api')
 
 const app = express()
@@ -32,6 +33,12 @@ app.use('*', function (err, req, res, next) {
   })
 })
 
-app.listen(port, function() {
-  console.log("== Server is running on port", port)
+// app.listen(port, function() {
+//   console.log("== Server is running on port", port)
+// })
+
+sequelize.sync().then(function () {
+    app.listen(port, function () {
+        console.log("== Server is listening on port:", port)
+    })
 })
