@@ -1,7 +1,8 @@
 const router = require('express').Router()
 const { validateAgainstSchema, extractValidFields } = require('../lib/validation')
-
+const { ValidationError } = require("sequelize")
 const photos = require('../data/photos')
+const Photo = require('../models/photo')
 
 exports.router = router
 exports.photos = photos
@@ -19,32 +20,36 @@ const photoSchema = {
 /*
  * Route to create a new photo.
  */
-router.post('/', function (req, res, next) {
-  if (validateAgainstSchema(req.body, photoSchema)) {
-    const photo = extractValidFields(req.body, photoSchema)
-    photo.id = photos.length
-    photos.push(photo)
+router.post('/', async function (req, res, next) {
+  try{
+    const photo = await Photo.create(req.body, [
+      "userId",
+      "businessId",
+      "caption"
+    ])
+    console.log("  -- photo:", photo.toJSON())
     res.status(201).send({
-      id: photo.id,
-      links: {
-        photo: `/photos/${photo.id}`,
-        business: `/businesses/${photo.businessid}`
-      }
+        id: photo.id
     })
-  } else {
-    res.status(400).send({
-      error: "Request body is not a valid photo object"
-    })
+  }catch(e){
+    if (e instanceof ValidationError) {
+      res.status(404).send({
+        err: e.message
+      })
+    }else{
+      next(e)
+    }
   }
 })
 
 /*
  * Route to fetch info about a specific photo.
  */
-router.get('/:photoID', function (req, res, next) {
+router.get('/:photoID', async function (req, res, next) {
   const photoID = parseInt(req.params.photoID)
-  if (photos[photoID]) {
-    res.status(200).send(photos[photoID])
+  const photo = await Photo.findByPk(photoID)
+  if (photo) {
+    res.status(200).send(photo)
   } else {
     next()
   }
@@ -53,38 +58,38 @@ router.get('/:photoID', function (req, res, next) {
 /*
  * Route to update a photo.
  */
-router.put('/:photoID', function (req, res, next) {
+router.put('/:photoID', async function (req, res, next) {
   const photoID = parseInt(req.params.photoID)
-  if (photos[photoID]) {
-
-    if (validateAgainstSchema(req.body, photoSchema)) {
-      /*
-       * Make sure the updated photo has the same businessid and userid as
-       * the existing photo.
-       */
-      const updatedPhoto = extractValidFields(req.body, photoSchema)
-      const existingPhoto = photos[photoID]
-      if (existingPhoto && updatedPhoto.businessid === existingPhoto.businessid && updatedPhoto.userid === existingPhoto.userid) {
-        photos[photoID] = updatedPhoto
-        photos[photoID].id = photoID
+  const updatedData = {
+    userId: req.body.userId,
+    businessId: req.body.businessId,
+    caption: req.body.caption
+  }
+  const photo = await Photo.findByPk(photoID)
+  
+  if (photo){
+    if (photo.businessId === updatedData.businessId && photo.userId === updatedData.userId ) {
+      try{
+        await Photo.update(updatedData, {
+          where:{
+            id: photoID
+          }
+        })
         res.status(200).send({
           links: {
             photo: `/photos/${photoID}`,
-            business: `/businesses/${updatedPhoto.businessid}`
+            business: `/businesses/${updatedData.businessId}`
           }
         })
-      } else {
-        res.status(403).send({
-          error: "Updated photo cannot modify businessid or userid"
-        })
+      }catch(e){
+        next(e)
       }
-    } else {
-      res.status(400).send({
-        error: "Request body is not a valid photo object"
+    }else{
+      res.status(403).send({
+        error: "Updated photo cannot modify businessid or userid"
       })
     }
-
-  } else {
+  }else{
     next()
   }
 })
@@ -92,12 +97,21 @@ router.put('/:photoID', function (req, res, next) {
 /*
  * Route to delete a photo.
  */
-router.delete('/:photoID', function (req, res, next) {
+router.delete('/:photoID', async function (req, res, next) {
   const photoID = parseInt(req.params.photoID)
-  if (photos[photoID]) {
-    photos[photoID] = null
-    res.status(204).end()
-  } else {
+  const photo = await Photo.findByPk(photoID)
+  if (photo) {
+    try{
+      await Photo.destroy({
+        where: {
+          id: photoID
+        }
+      })
+      res.sendStatus(204)
+    }catch(e){
+      next(e)
+    }
+  }else{
     next()
   }
 })

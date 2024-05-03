@@ -1,9 +1,12 @@
 const router = require('express').Router()
 const { validateAgainstSchema, extractValidFields } = require('../lib/validation')
-
+const { ValidationError } = require("sequelize")
 const businesses = require('../data/businesses')
 const { reviews } = require('./reviews')
 const { photos } = require('./photos')
+const Business = require("../models/business")
+const Photo = require('../models/photo')
+const Review = require('../models/review')
 
 exports.router = router
 exports.businesses = businesses
@@ -28,26 +31,19 @@ const businessSchema = {
 /*
  * Route to return a list of businesses.
  */
-router.get('/', function (req, res) {
+router.get('/', async function (req, res) {
 
-  /*
-   * Compute page number based on optional query string parameter `page`.
-   * Make sure page is within allowed bounds.
-   */
   let page = parseInt(req.query.page) || 1
   const numPerPage = 10
-  const lastPage = Math.ceil(businesses.length / numPerPage)
-  page = page > lastPage ? lastPage : page
   page = page < 1 ? 1 : page
+  const offset = (page - 1) * numPerPage
 
-  /*
-   * Calculate starting and ending indices of businesses on requested page and
-   * slice out the corresponsing sub-array of busibesses.
-   */
-  const start = (page - 1) * numPerPage
-  const end = start + numPerPage
-  const pageBusinesses = businesses.slice(start, end)
-
+  const result = await Business.findAndCountAll({
+    limit: numPerPage,
+    offset: offset
+  })
+  const totalCount = result.count
+  const lastPage = Math.ceil(totalCount / numPerPage)
   /*
    * Generate HATEOAS links for surrounding pages.
    */
@@ -65,11 +61,10 @@ router.get('/', function (req, res) {
    * Construct and send response.
    */
   res.status(200).send({
-    businesses: pageBusinesses,
+    businesses: result.rows,
     pageNumber: page,
-    totalPages: lastPage,
     pageSize: numPerPage,
-    totalCount: businesses.length,
+    totalCount: result.count,
     links: links
   })
 
@@ -78,42 +73,49 @@ router.get('/', function (req, res) {
 /*
  * Route to create a new business.
  */
-router.post('/', function (req, res, next) {
-  if (validateAgainstSchema(req.body, businessSchema)) {
-    const business = extractValidFields(req.body, businessSchema)
-    business.id = businesses.length
-    businesses.push(business)
+router.post('/', async function (req, res, next) {
+  try{
+    const business = await Business.create(req.body,[
+      "ownerId",
+      "name",
+      "address",
+      "city",
+      "state",
+      "zip",
+      "phone",
+      "category",
+      "subcategory",
+      "website",
+      "email"
+    ])
+
+    console.log("  -- business:", business.toJSON())
     res.status(201).send({
-      id: business.id,
-      links: {
-        business: `/businesses/${business.id}`
-      }
+        id: business.id
     })
-  } else {
-    res.status(400).send({
-      error: "Request body is not a valid business object"
-    })
+  }catch(e){
+    if (e instanceof ValidationError){
+      res.status(404).send({
+        err: e.message
+      })
+    }else{
+      next(e)
+    }
   }
+  
 })
 
 /*
  * Route to fetch info about a specific business.
  */
-router.get('/:businessid', function (req, res, next) {
-  const businessid = parseInt(req.params.businessid)
-  if (businesses[businessid]) {
-    /*
-     * Find all reviews and photos for the specified business and create a
-     * new object containing all of the business data, including reviews and
-     * photos.
-     */
-    const business = {
-      reviews: reviews.filter(review => review && review.businessid === businessid),
-      photos: photos.filter(photo => photo && photo.businessid === businessid)
-    }
-    Object.assign(business, businesses[businessid])
+router.get('/:businessId', async function (req, res, next) {
+  const businessId = parseInt(req.params.businessId)
+  const business = await Business.findByPk(businessId, {
+    include: [Photo, Review]
+  })
+  if (business){
     res.status(200).send(business)
-  } else {
+  }else{
     next()
   }
 })
@@ -121,38 +123,57 @@ router.get('/:businessid', function (req, res, next) {
 /*
  * Route to replace data for a business.
  */
-router.put('/:businessid', function (req, res, next) {
-  const businessid = parseInt(req.params.businessid)
-  if (businesses[businessid]) {
-
-    if (validateAgainstSchema(req.body, businessSchema)) {
-      businesses[businessid] = extractValidFields(req.body, businessSchema)
-      businesses[businessid].id = businessid
-      res.status(200).send({
-        links: {
-          business: `/businesses/${businessid}`
+router.put('/:businessId', async function (req, res, next) {
+  const businessId = parseInt(req.params.businessId)
+  const existingBusiness = await Business.findByPk(businessId);
+  const updatedData = {
+    ownerId: req.body.ownerId,
+    name: req.body.name,
+    address: req.body.address,
+    city: req.body.city,
+    state: req.body.state,
+    zip: req.body.zip,
+    phone: req.body.phone,
+    category: req.body.category,
+    subcategory: req.body.subcategory,
+    website: req.body.website,
+    email: req.body.email,
+  };
+  if (!existingBusiness){
+    next()
+  }else{
+    try{
+      const business = await Business.update(updatedData,{
+        where: {
+          id: businessId
         }
       })
-    } else {
-      res.status(400).send({
-        error: "Request body is not a valid business object"
-      })
+      console.log("  -- business:", business)
+      res.sendStatus(204)
+    }catch(e){
+      next(e)
     }
-
-  } else {
-    next()
   }
 })
 
 /*
  * Route to delete a business.
  */
-router.delete('/:businessid', function (req, res, next) {
-  const businessid = parseInt(req.params.businessid)
-  if (businesses[businessid]) {
-    businesses[businessid] = null
-    res.status(204).end()
-  } else {
+router.delete('/:businessId', async function (req, res, next) {
+  const businessId = parseInt(req.params.businessId);
+  const existingBusiness = await Business.findByPk(businessId);
+  if (!existingBusiness) {
     next()
+  }else{
+    try{
+      await Business.destroy({
+        where: {
+          id: businessId
+        }
+      })
+      res.sendStatus(204)
+    }catch(e){
+      next(e)
   }
+}
 })

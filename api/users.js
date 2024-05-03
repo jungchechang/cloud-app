@@ -5,13 +5,20 @@ exports.router = router
 const { businesses } = require('./businesses')
 const { reviews } = require('./reviews')
 const { photos } = require('./photos')
+const Business = require("../models/business")
+const Photo = require('../models/photo')
+const Review = require('../models/review')
 
 /*
  * Route to list all of a user's businesses.
  */
-router.get('/:userid/businesses', function (req, res) {
-  const userid = parseInt(req.params.userid)
-  const userBusinesses = businesses.filter(business => business && business.ownerid === userid)
+router.get('/:userId/businesses',async function (req, res) {
+  const userId = parseInt(req.params.userId)
+  const userBusinesses = await Business.findAll({
+    where:{
+      ownerId: userId
+    }
+  })
   res.status(200).send({
     businesses: userBusinesses
   })
@@ -20,9 +27,13 @@ router.get('/:userid/businesses', function (req, res) {
 /*
  * Route to list all of a user's reviews.
  */
-router.get('/:userid/reviews', function (req, res) {
-  const userid = parseInt(req.params.userid)
-  const userReviews = reviews.filter(review => review && review.userid === userid)
+router.get('/:userId/reviews', async function (req, res) {
+  const userId = parseInt(req.params.userId)
+  const userReviews = await Review.findAll({
+    where: {
+      userId: userId
+    }
+  })
   res.status(200).send({
     reviews: userReviews
   })
@@ -31,9 +42,13 @@ router.get('/:userid/reviews', function (req, res) {
 /*
  * Route to list all of a user's photos.
  */
-router.get('/:userid/photos', function (req, res) {
-  const userid = parseInt(req.params.userid)
-  const userPhotos = photos.filter(photo => photo && photo.userid === userid)
+router.get('/:userId/photos', async function (req, res) {
+  const userId = parseInt(req.params.userId)
+  const userPhotos = await Photo.findAll({
+    where: {
+      userId: userId
+    }
+  })
   res.status(200).send({
     photos: userPhotos
   })
