@@ -2,5 +2,6 @@ FROM node:20
 WORKDIR /usr/src/app
 COPY . .
 RUN npm install
-EXPOSE 8000
-CMD [ "node", "server.js" ]
+ENV PORT=8000
+EXPOSE ${PORT}
+CMD [ "npm", "start" ]
