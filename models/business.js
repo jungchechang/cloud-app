@@ -2,7 +2,7 @@ const { DataTypes } = require("sequelize")
 const sequelize = require("../sequelize")
 
 const Business = sequelize.define('business', {
-    ownerid: { type: DataTypes.INTEGER, allowNull: false},
+    ownerId: { type: DataTypes.INTEGER, allowNull: false},
     name : { type: DataTypes.STRING, allowNull: false},
     address: {type: DataTypes.STRING, allowNull: false},
     city: {type: DataTypes.STRING, allowNull: false},
