@@ -1,13 +1,13 @@
 [
   {
-    "userId": 7,
+    "userId": 1,
     "businessId": 8,
     "dollars": 1,
     "stars": 4.5,
     "review": "Cheap, delicious food."
   },
   {
-    "userId": 25,
+    "userId": 1,
     "businessId": 2,
     "dollars": 1,
     "stars": 4,
