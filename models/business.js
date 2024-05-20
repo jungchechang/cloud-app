@@ -1,5 +1,5 @@
-const { DataTypes } = require("sequelize")
-const sequelize = require("../sequelize")
+const { DataTypes } = require('sequelize')
+const sequelize = require("../lib/sequelize")
 
 const Business = sequelize.define('business', {
     ownerId: { type: DataTypes.INTEGER, allowNull: false},
@@ -15,4 +15,18 @@ const Business = sequelize.define('business', {
     email: {type: DataTypes.STRING, allowNull: true}
 })
 
-module.exports = Business
+BusinessClientFields = [
+    'ownerId',
+    'name',
+    'address',
+    'city',
+    'state',
+    'zip',
+    'phone',
+    'category',
+    'subcategory',
+    'website',
+    'email'
+]
+
+module.exports = {Business, BusinessClientFields}

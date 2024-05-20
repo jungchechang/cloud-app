@@ -1,12 +1,11 @@
 const router = require('express').Router()
 const { validateAgainstSchema, extractValidFields } = require('../lib/validation')
-const { ValidationError } = require("sequelize")
+const { ValidationError } = require('sequelize')
 const businesses = require('../data/businesses')
-const { reviews } = require('./reviews')
-const { photos } = require('./photos')
-const Business = require("../models/business")
-const Photo = require('../models/photo')
-const Review = require('../models/review')
+const {Business, BusinessClientFields} = require("../models/business")
+const {Photo} = require('../models/photo')
+const {Review} = require('../models/review')
+const{requireAuthentication} = require('../lib/auth')
 
 exports.router = router
 exports.businesses = businesses
@@ -73,107 +72,126 @@ router.get('/', async function (req, res) {
 /*
  * Route to create a new business.
  */
-router.post('/', async function (req, res, next) {
-  try{
-    const business = await Business.create(req.body,[
-      "ownerId",
-      "name",
-      "address",
-      "city",
-      "state",
-      "zip",
-      "phone",
-      "category",
-      "subcategory",
-      "website",
-      "email"
-    ])
-
-    console.log("  -- business:", business.toJSON())
-    res.status(201).send({
-        id: business.id
+router.post('/', requireAuthentication, async function (req, res, next) {
+  const business = req.body
+  const ownerId = parseInt(business.ownerId)
+  if (req.user !== ownerId && !req.isAdmin) {
+    res.status(403).send({
+      error: "Not authorized to access the specified resource"
     })
-  }catch(e){
-    if (e instanceof ValidationError){
-      res.status(404).send({
-        err: e.message
+  }else{
+    try{
+      const business_data = await Business.create(req.body, BusinessClientFields)
+      console.log("  -- business:", business_data.toJSON())
+      res.status(201).send({
+          id: business_data.id
       })
-    }else{
-      next(e)
+    }catch(e){
+      if (e instanceof ValidationError){
+        res.status(404).send({
+          err: e.message
+        })
+      }else{
+        next(e)
+      }
     }
   }
-  
 })
 
 /*
  * Route to fetch info about a specific business.
  */
 router.get('/:businessId', async function (req, res, next) {
-  const businessId = parseInt(req.params.businessId)
-  const business = await Business.findByPk(businessId, {
-    include: [Photo, Review]
-  })
-  if (business){
-    res.status(200).send(business)
-  }else{
-    next()
+  const businessId = req.params.businessId
+  try {
+    const business = await Business.findByPk(businessId, {
+      include: [ Photo, Review ]
+    })
+    if (business) {
+      res.status(200).send(business)
+    } else {
+      next()
+    }
+  } catch (e) {
+    next(e)
   }
 })
 
 /*
  * Route to replace data for a business.
  */
-router.put('/:businessId', async function (req, res, next) {
+router.put('/:businessId', requireAuthentication, async function (req, res, next) {
+  const business = req.body
+  const ownerId = parseInt(business.ownerId)
   const businessId = parseInt(req.params.businessId)
-  const existingBusiness = await Business.findByPk(businessId);
-  const updatedData = {
-    ownerId: req.body.ownerId,
-    name: req.body.name,
-    address: req.body.address,
-    city: req.body.city,
-    state: req.body.state,
-    zip: req.body.zip,
-    phone: req.body.phone,
-    category: req.body.category,
-    subcategory: req.body.subcategory,
-    website: req.body.website,
-    email: req.body.email,
-  };
-  if (!existingBusiness){
-    next()
-  }else{
-    try{
-      const business = await Business.update(updatedData,{
-        where: {
-          id: businessId
-        }
+  try{
+    const existingBusiness = await Business.findByPk(businessId);
+    console.log(req.user, ownerId, existingBusiness.ownerId)
+    if ((req.user !== existingBusiness.ownerId || req.user !== ownerId )&& !req.isAdmin) {
+      res.status(403).send({
+        error: "Not authorized to access the specified resource"
       })
-      console.log("  -- business:", business)
-      res.sendStatus(204)
-    }catch(e){
-      next(e)
+    }else{
+      const updatedData = {
+        ownerId: business.ownerId,
+        name: business.name,
+        address: business.address,
+        city: business.city,
+        state: business.state,
+        zip: business.zip,
+        phone: business.phone,
+        category: business.category,
+        subcategory: business.subcategory,
+        website: business.website,
+        email: business.email,
+      };
+      if (!existingBusiness){
+        next()
+      }else{
+        try{
+          const business = await Business.update(updatedData,{
+            where: {
+              id: businessId
+            }
+          })
+          console.log("  -- business:", business)
+          res.sendStatus(204)
+        }catch(e){
+          if (e instanceof ValidationError) {
+            res.status(400).send({ error: e.message })
+          } else {
+            next(e)
+          }
+        }
+      }
     }
+  }catch(e){
+    next(e)
   }
 })
 
 /*
  * Route to delete a business.
  */
-router.delete('/:businessId', async function (req, res, next) {
-  const businessId = parseInt(req.params.businessId);
-  const existingBusiness = await Business.findByPk(businessId);
-  if (!existingBusiness) {
-    next()
-  }else{
-    try{
-      await Business.destroy({
-        where: {
-          id: businessId
+router.delete('/:businessId', requireAuthentication, async function (req, res, next) {
+  const businessId = req.params.businessId
+  try{
+    const existingBusiness = await Business.findByPk(businessId);
+    if (existingBusiness){
+      if (req.user !== existingBusiness.ownerId && !req.isAdmin) {
+        res.status(403).send({
+          error: "Not authorized to access the specified resource"
+        })
+      }else{
+        const result = await Business.destroy({ where: { id: businessId }})
+        if (result > 0) {
+          res.status(204).send()
         }
-      })
-      res.sendStatus(204)
-    }catch(e){
-      next(e)
+      }
+    }else{
+      next()
+    }
+  }catch(e){
+    next(e)
   }
-}
 })

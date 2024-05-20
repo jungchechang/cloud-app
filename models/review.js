@@ -1,7 +1,7 @@
-const { DataTypes } = require("sequelize")
-const sequelize = require("../sequelize")
+const { DataTypes } = require('sequelize')
+const sequelize = require("../lib/sequelize")
 
-const Business = require("./business")
+const {Business} = require("./business")
 const Review = sequelize.define('review', {
     userId: {type: DataTypes.INTEGER, allowNull: false },
     businessId: {type: DataTypes.INTEGER, allowNull: false},
@@ -16,4 +16,13 @@ Business.hasMany(Review, {
 })
 Review.belongsTo(Business)
 
-module.exports = Review
+
+ReviewClientFields = [
+    'userId',
+    'dollars',
+    'stars',
+    'review',
+    'businessId'
+]
+
+module.exports = {Review, ReviewClientFields}
