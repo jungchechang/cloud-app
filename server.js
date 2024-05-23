@@ -1,73 +1,73 @@
-const express = require('express')
-const morgan = require('morgan')
-const sequelize = require("./lib/sequelize")
-const {Business} = require("./models/business")
-const {Photo} = require('./models/photo')
-const {Review} = require('./models/review')
-const {User} = require('./models/user')
-const businesses = require('./data/businesses.json')
-const reviews = require('./data/reviews.json')
-const photos = require('./data/photos.json')
-const api = require('./api')
+const express = require('express');
+const https = require('https');
+const fs = require('fs');
+const morgan = require('morgan');
+const sequelize = require("./lib/sequelize");
+const { Business } = require("./models/business");
+const { Photo } = require('./models/photo');
+const { Review } = require('./models/review');
+const { User } = require('./models/user');
+const businesses = require('./data/businesses.json');
+const reviews = require('./data/reviews.json');
+const photos = require('./data/photos.json');
+const api = require('./api');
 
-const app = express()
-const port = process.env.PORT || 8000
-/*
- * Morgan is a popular request logger.
- */
-app.use(morgan('dev'))
+const app = express();
+const port = process.env.PORT || 8000;
 
-app.use(express.json())
-app.use(express.static('public'))
+// SSL Certificate
+const privateKey = fs.readFileSync('./certificate/key.pem', 'utf8');
+const certificate = fs.readFileSync('./certificate/cert.pem', 'utf8');
+const credentials = { key: privateKey, cert: certificate };
 
-//initializeDatabase
+// Morgan is a popular request logger.
+app.use(morgan('dev'));
+
+app.use(express.json());
+app.use(express.static('public'));
+
+// Initialize Database
 async function initializeDatabase() {
-  try {
-      await sequelize.authenticate();
-      console.log('Connection has been established successfully.');
-
-      // Force true will drop the table if it already exists
-      await sequelize.sync({ force: true });
-      console.log('Tables has been successfully created.');
-      await Business.bulkCreate(businesses);
-      console.log('Business data has been successfully created.');
-      await Review.bulkCreate(reviews);
-      console.log('Review data has been successfully created.');
-      await Photo.bulkCreate(photos);
-      console.log('Photo data has been successfully created.');
-
-  } catch (error) {
-      console.error('Error during the initialization of the database:', error);
-  }
+    try {
+        await sequelize.authenticate();
+        console.log('Connection has been established successfully.');
+        await sequelize.sync({ force: true });
+        console.log('Tables has been successfully created.');
+        await Business.bulkCreate(businesses);
+        console.log('Business data has been successfully created.');
+        await Review.bulkCreate(reviews);
+        console.log('Review data has been successfully created.');
+        await Photo.bulkCreate(photos);
+        console.log('Photo data has been successfully created.');
+    } catch (error) {
+        console.error('Error during the initialization of the database:', error);
+    }
 }
 
 initializeDatabase();
 
-app.use('/', api)
+app.use('/', api);
 
 app.use('*', function (req, res, next) {
-  res.status(404).send({
-    error: `Requested resource "${req.originalUrl}" does not exist`
-  })
-})
+    res.status(404).send({
+        error: `Requested resource "${req.originalUrl}" does not exist`
+    });
+});
 
-/*
- * This route will catch any errors thrown from our API endpoints and return
- * a response with a 500 status to the client.
- */
 app.use('*', function (err, req, res, next) {
-  console.error("== Error:", err)
-  res.status(500).send({
-      error: "Server error.  Please try again later."
-  })
-})
+    console.error("== Error:", err);
+    res.status(500).send({
+        error: "Server error. Please try again later."
+    });
+});
 
-app.listen(port, function() {
-  console.log("== Server is running on port", port)
-})
+// Create HTTPS server
+const httpsServer = https.createServer(credentials, app);
 
-// sequelize.sync().then(function () {
-//     app.listen(port, function () {
-//         console.log("== Server is listening on port:", port)
-//     })
+httpsServer.listen(port, function() {
+    console.log("== HTTPS Server is running on port", port);
+});
+
+// app.listen(port, function () {
+//   console.log("== Server is running on port", port)
 // })
