@@ -7,6 +7,7 @@ const { Business } = require("./models/business");
 const { Photo } = require('./models/photo');
 const { Review } = require('./models/review');
 const { User } = require('./models/user');
+const {rateLimit, redisClient} = require('./lib/rateLimit')
 const businesses = require('./data/businesses.json');
 const reviews = require('./data/reviews.json');
 const photos = require('./data/photos.json');
@@ -20,11 +21,12 @@ const privateKey = fs.readFileSync('./certificate/key.pem', 'utf8');
 const certificate = fs.readFileSync('./certificate/cert.pem', 'utf8');
 const credentials = { key: privateKey, cert: certificate };
 
+
 // Morgan is a popular request logger.
 app.use(morgan('dev'));
-
 app.use(express.json());
 app.use(express.static('public'));
+
 
 // Initialize Database
 async function initializeDatabase() {
@@ -34,7 +36,7 @@ async function initializeDatabase() {
         await sequelize.sync({ force: true });
         console.log('Tables has been successfully created.');
         await Business.bulkCreate(businesses);
-        console.log('Business data has been successfully created.');
+        console.log('Business data has been sulsccessfully created.');
         await Review.bulkCreate(reviews);
         console.log('Review data has been successfully created.');
         await Photo.bulkCreate(photos);
@@ -45,6 +47,9 @@ async function initializeDatabase() {
 }
 
 initializeDatabase();
+
+
+app.use(rateLimit)
 
 app.use('/', api);
 
@@ -64,10 +69,9 @@ app.use('*', function (err, req, res, next) {
 // Create HTTPS server
 const httpsServer = https.createServer(credentials, app);
 
-httpsServer.listen(port, function() {
-    console.log("== HTTPS Server is running on port", port);
-});
-
-// app.listen(port, function () {
-//   console.log("== Server is running on port", port)
-// })
+redisClient.connect().then(() => {
+    console.log("Connected to Redis");
+    httpsServer.listen(port, function() {
+        console.log("== HTTPS Server is running on port", port);
+    });
+  }).catch(console.error);
