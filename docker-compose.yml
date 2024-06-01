@@ -1,10 +1,10 @@
 services:
-  node1:
+  mysqldb:
     image: mysql
-    container_name: node1
+    container_name: mysqldb
     ports:
       - 3306:3306
-    hostname: node1
+    hostname: mysqldb
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
@@ -12,122 +12,57 @@ services:
       retries: 5
     networks:
       - groupnet
-    volumes:
-      - d1:/var/lib/mysql
     environment:
       MYSQL_ROOT_PASSWORD: root
-    command: >
-      --server-id=1
-      --log-bin=mysql-bin-1.log
-      --enforce-gtid-consistency=ON
-      --log-replica-updates=ON
-      --gtid-mode=ON
-      --transaction-write-set-extraction=XXHASH64
-      --binlog-checksum=NONE
-      --master-info-repository='TABLE'
-      --relay-log-info-repository='TABLE'
-      --plugin-load=group_replication.so
-      --relay-log-recovery=ON
-      --group-replication-start-on-boot=OFF
-      --group-replication-group-name=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
-      --group-replication-local-address=node1:33061
-      --group-replication-group-seeds='node1:33061,node2:33061,node3:33061'
-      --loose-group-replication-single-primary-mode=ON
-      --loose-group-replication-enforce-update-everywhere-checks=OFF
-
-  node2:
-    image: mysql
-    container_name: node2
-    ports:
-      - 3307:3306
-    hostname: node2
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - groupnet
-    volumes:
-      - d2:/var/lib/mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-    command: >
-      --server-id=2
-      --log-bin=mysql-bin-1.log
-      --enforce-gtid-consistency=ON
-      --log-replica-updates=ON
-      --gtid-mode=ON
-      --transaction-write-set-extraction=XXHASH64
-      --binlog-checksum=NONE
-      --master-info-repository='TABLE'
-      --relay-log-info-repository='TABLE'
-      --plugin-load=group_replication.so
-      --relay-log-recovery=ON
-      --group-replication-start-on-boot=OFF
-      --group-replication-group-name=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
-      --group-replication-local-address=node2:33061
-      --group-replication-group-seeds='node1:33061,node2:33061,node3:33061'
-      --loose-group-replication-single-primary-mode=ON
-      --loose-group-replication-enforce-update-everywhere-checks=OFF
+      MYSQL_DATABASE: app
   
-  node3:
-    image: mysql
-    container_name: node3
+  redis:
+    image: redis
     ports:
-      - 3308:3306
-    hostname: node3
+      - "6379:6379"
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: [ "CMD-SHELL", "redis-cli ping | grep PONG" ]
+      timeout: 10s
+      retries: 10
     networks:
       - groupnet
-    volumes:
-      - d3:/var/lib/mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-    command: >
-      --server-id=3
-      --log-bin=mysql-bin-1.log
-      --enforce-gtid-consistency=ON
-      --log-replica-updates=ON
-      --gtid-mode=ON
-      --transaction-write-set-extraction=XXHASH64
-      --binlog-checksum=NONE
-      --master-info-repository='TABLE'
-      --relay-log-info-repository='TABLE'
-      --plugin-load=group_replication.so
-      --relay-log-recovery=ON
-      --group-replication-start-on-boot=OFF
-      --group-replication-group-name=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
-      --group-replication-local-address=node3:33061
-      --group-replication-group-seeds='node1:33061,node2:33061,node3:33061'
-      --loose-group-replication-single-primary-mode=ON
-      --loose-group-replication-enforce-update-everywhere-checks=OFF
+
+  rabbitmq:
+    image: rabbitmq:management
+    hostname: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: rabbitmq-diagnostics check_port_connectivity
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - groupnet
 
   app:
     container_name: app
-    image: hw2
+    image: yelp-like-app
     ports:
       - 8000:8000
     depends_on:
-      node1:
+      mysqldb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     environment:
-      MYSQL_HOST: node1
-      MYSQL_USER: root
       MYSQL_PASSWORD: root
+      REDIS_HOST: redis
+      MYSQL_HOST: mysqldb
+      RABBITMQ_HOST: rabbitmq
 
     networks:
       - groupnet
-
 
 networks:
   groupnet:
     driver: bridge
-volumes:
-  d1:
-  d2:
-  d3:
