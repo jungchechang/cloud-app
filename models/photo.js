@@ -4,7 +4,12 @@ const {Business} = require("./business")
 const Photo = sequelize.define('photo', {
     userId: {type: DataTypes.INTEGER, allowNull: false },
     businessId:{type: DataTypes.INTEGER, allowNull: false},
-    caption: {type: DataTypes.STRING, allowNull: true}
+    caption: {type: DataTypes.STRING, allowNull: true},
+    filename:{type: DataTypes.STRING, allowNull: true},
+    path:{type: DataTypes.STRING, allowNull: true},
+    thumbPath:{type: DataTypes.STRING, allowNull: true},
+    contentType:{type: DataTypes.STRING, allowNull: true}
+
 })
 Business.hasMany(Photo, {
     foreignKey: {allowNull: false},
@@ -17,7 +22,10 @@ Photo.belongsTo(Business)
 PhotoClientFields = [
     'userId',
     'caption',
-    'businessId'
+    'businessId',
+    'filename',
+    'path',
+    'contentType'
 ]
 
 async function createNewPhoto(photoData){

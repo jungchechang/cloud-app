@@ -4,6 +4,7 @@ const { ValidationError } = require('sequelize')
 const {Photo, PhotoClientFields, createNewPhoto, getPhotoById, updatePhotoById, deletePhotoById} = require('../models/photo')
 const{requireAuthentication} = require('../lib/auth')
 const {upload} = require('../lib/multer')
+const { connectToRabbitMQ, getChannel, queueName } = require('../lib/rabbitmq')
 
 exports.router = router
 
@@ -24,8 +25,13 @@ router.post('/', requireAuthentication, upload.single("image"), async function (
     })
   }else{
     try{
-      const photo = await Photo.create(req.body, PhotoClientFields)
-      console.log("  -- photo:", photo.toJSON())
+      const photo = await createNewPhoto(photo_data)
+      /*
+         * Generate offline work
+         */
+      const channel = getChannel()
+      channel.sendToQueue(queueName, Buffer.from(photo.id.toString()))
+
       res.status(201).send({
           id: photo.id
       })
