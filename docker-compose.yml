@@ -44,7 +44,7 @@ services:
 
   app:
     container_name: app
-    image: yelp-like-app
+    image: jungche/yelp-like-app:v1
     ports:
       - 8000:8000
     depends_on:
