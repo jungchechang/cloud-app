@@ -1,27 +1,23 @@
 const router = require('express').Router()
 const { validateAgainstSchema, extractValidFields } = require('../lib/validation')
 const { ValidationError } = require('sequelize')
-const {Photo, PhotoClientFields} = require('../models/photo')
+const {Photo, PhotoClientFields, createNewPhoto, getPhotoById, updatePhotoById, deletePhotoById} = require('../models/photo')
 const{requireAuthentication} = require('../lib/auth')
+const {upload} = require('../lib/multer')
 
 exports.router = router
 
 /*
- * Schema describing required/optional fields of a photo object.
- */
-const photoSchema = {
-  userid: { required: true },
-  businessid: { required: true },
-  caption: { required: false }
-}
-
-
-/*
  * Route to create a new photo.
  */
-router.post('/', requireAuthentication, async function (req, res, next) {
-  const photo = req.body
-  const userId = photo.userId
+router.post('/', requireAuthentication, upload.single("image"), async function (req, res, next) {
+  const photo_data = {
+    ...req.body,
+    filename:req.file.filename,
+    path: req.file.path,
+    contentType: req.file.mimetype
+  }
+  const userId = parseInt(photo_data.userId)
   if (req.user !== userId && !req.isAdmin) {
     res.status(403).send({
       error: "Not authorized to access the specified resource"
@@ -50,9 +46,13 @@ router.post('/', requireAuthentication, async function (req, res, next) {
  */
 router.get('/:photoID', async function (req, res, next) {
   const photoID = parseInt(req.params.photoID)
-  const photo = await Photo.findByPk(photoID)
+  const photo = await getPhotoById(photoID)
+  
   if (photo) {
-    res.status(200).send(photo)
+    res.status(200).send({
+      photo:photo,
+      url: `/media/photos/${photo.filename}`
+    })
   } else {
     next()
   }
@@ -70,7 +70,7 @@ router.put('/:photoID', requireAuthentication, async function (req, res, next) {
     caption: req.body.caption
   }
   try{
-    const existingPhoto = await Photo.findByPk(photoID)
+    const existingPhoto = await getPhotoById(photoID)
     if (existingPhoto){
       if ((req.user !== userId || req.user !== existingPhoto.userId) && !req.isAdmin) {
         res.status(403).send({
@@ -81,11 +81,7 @@ router.put('/:photoID', requireAuthentication, async function (req, res, next) {
           error: "Updated photo cannot modify businessid or userid"
         })
       }else{
-        const updatedPhoto = await Photo.update(updatedData, {
-          where:{
-            id: photoID
-          }
-        })
+        const updatedPhoto = await updatePhotoById(photoID, updatedData)
         res.status(204).send()
       }
     }else{
@@ -105,19 +101,21 @@ router.delete('/:photoID', requireAuthentication, async function (req, res, next
     next()
   } 
   try{
-    const photo = await Photo.findByPk(photoID)
+    const photo = await getPhotoById(photoID)
     if (photo){
       if (req.user !== photo.userId && !req.isAdmin) {
         res.status(403).send({
           error: "Not authorized to access the specified resource"
         });
       }else{
-        await Photo.destroy({
-          where: {
-            id: photoID
-          }
-        });
-        res.status(204).send();
+        const result = await deletePhotoById(photoID)
+        if (result) {
+          res.status(204).send();
+        }else{
+          res.status(400).send({
+            error: "Unable to delete photo"
+          });
+        }
       }
     }else{
       next();

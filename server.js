@@ -7,6 +7,7 @@ const { Business } = require("./models/business");
 const { Photo } = require('./models/photo');
 const { Review } = require('./models/review');
 const { User } = require('./models/user');
+const { connectToRabbitMQ, getChannel, queueName } = require('./lib/rabbitmq')
 const {rateLimit, redisClient} = require('./lib/rateLimit')
 const businesses = require('./data/businesses.json');
 const reviews = require('./data/reviews.json');
@@ -69,8 +70,9 @@ app.use('*', function (err, req, res, next) {
 // Create HTTPS server
 const httpsServer = https.createServer(credentials, app);
 
-redisClient.connect().then(() => {
+redisClient.connect().then(async () => {
     console.log("Connected to Redis");
+    await connectToRabbitMQ()
     httpsServer.listen(port, function() {
         console.log("== HTTPS Server is running on port", port);
     });

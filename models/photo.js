@@ -20,4 +20,48 @@ PhotoClientFields = [
     'businessId'
 ]
 
-module.exports = {Photo, PhotoClientFields}
+async function createNewPhoto(photoData){
+    const result = await Photo.create(photoData, PhotoClientFields)
+    if (result){
+        return result
+    }else{
+        return null
+    }
+}
+
+async function getPhotoById(photoId){
+    const photo = await Photo.findByPk(photoId)
+    if (photo){
+        return photo
+    }else{
+        null
+    }
+}
+
+async function updatePhotoById(photoId, photoData){
+    const result = await Photo.update(photoData, {
+        where:{
+            id: photoId
+        }
+    })
+    if (result){
+        return result
+    }else{
+        return null
+    }
+}
+
+async function deletePhotoById(photoId) {
+    const result = await Photo.destroy({
+        where:{
+            id: photoId
+        }
+    })
+    if (result){
+        return result
+    }else{
+        return null
+    }
+}
+
+module.exports = {Photo, PhotoClientFields, createNewPhoto, getPhotoById, updatePhotoById, deletePhotoById}
